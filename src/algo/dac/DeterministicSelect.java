@@ -25,29 +25,50 @@ public final class DeterministicSelect {
         if (k < 0 || k >= a.length) throw new IllegalArgumentException("k out of range");
         int[] copy = Arrays.copyOf(a, a.length);
         long t0 = System.nanoTime();
-        m.onEnter();
-        int ans = selectInPlaceQuick(copy, 0, copy.length - 1, k, m); // временный quickselect
-        m.onExit();
+        int ans = selectInPlace(copy, 0, copy.length - 1, k, m);
         m.elapsedNanos = System.nanoTime() - t0;
         return ans;
     }
 
-    private static int selectInPlaceQuick(int[] a, int l, int r, int k, Metrics m) {
+    /** Уже MoM5, но без tail-elimination и smaller-first. */
+    private static int selectInPlace(int[] a, int l, int r, int k, Metrics m) {
         if (l == r) return a[l];
-        int pivotValue = a[(l + r) >>> 1];
-        int p = partitionAroundValue(a, l, r, pivotValue, m);
+
+        int pivotVal = medianOfMedians(a, l, r, m);
+        int p = partitionAroundValue(a, l, r, pivotVal, m);
+
         if (k == p) return a[p];
         if (k < p) {
             m.onEnter();
-            int res = selectInPlaceQuick(a, l, p - 1, k, m);
+            int res = selectInPlace(a, l, p - 1, k, m);
             m.onExit();
             return res;
         } else {
             m.onEnter();
-            int res = selectInPlaceQuick(a, p + 1, r, k, m);
+            int res = selectInPlace(a, p + 1, r, k, m);
             m.onExit();
             return res;
         }
+    }
+
+    private static int medianOfMedians(int[] a, int l, int r, Metrics m) {
+        int n = r - l + 1;
+        if (n <= 5) {
+            insertionSort(a, l, r, m);
+            return a[l + n / 2];
+        }
+        int write = l;
+        for (int i = l; i <= r; i += 5) {
+            int gL = i, gR = Math.min(i + 4, r);
+            insertionSort(a, gL, gR, m);
+            int med = gL + (gR - gL) / 2;
+            swap(a, write++, med, m);
+        }
+        int midIndex = l + (write - l - 1) / 2;
+        m.onEnter();
+        int mom = selectInPlace(a, l, write - 1, midIndex, m);
+        m.onExit();
+        return mom;
     }
 
     private static int partitionAroundValue(int[] a, int l, int r, int pivotValue, Metrics m) {
@@ -91,16 +112,18 @@ public final class DeterministicSelect {
 
     public static void main(String[] args) {
         Random rnd = new Random(42);
-        int n = 40;
+        int n = 20000;
         int[] arr = new int[n];
-        for (int i = 0; i < n; i++) arr[i] = rnd.nextInt(1000);
+        for (int i = 0; i < n; i++) arr[i] = rnd.nextInt();
 
         int[] s = Arrays.copyOf(arr, arr.length);
         Arrays.sort(s);
-        int k = n / 2;
-
-        Metrics m = new Metrics();
-        int got = select(arr, k, m);
-        System.out.println("ok=" + (got == s[k]) + " value=" + got + " depth=" + m.maxRecursionDepth);
+        int[] ks = {0, n/4, n/2, 3*n/4, n-1};
+        for (int k : ks) {
+            Metrics m = new Metrics();
+            int got = select(arr, k, m);
+            System.out.printf("k=%-7d ok=%s time=%.3f ms comps=%d swaps=%d depth=%d%n",
+                    k, (got == s[k]), m.elapsedNanos/1e6, m.comparisons, m.swaps, m.maxRecursionDepth);
+        }
     }
 }
