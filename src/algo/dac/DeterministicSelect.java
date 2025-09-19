@@ -6,27 +6,15 @@ import java.util.Random;
 public final class DeterministicSelect {
 
     public static final class Metrics {
-        public long comparisons;
-        public long swaps;
-        public long allocations;
-        public int recursionDepth;
-        public int maxRecursionDepth;
+        public long comparisons, swaps, allocations;
+        public int recursionDepth, maxRecursionDepth;
         public long elapsedNanos;
-
-        public void onEnter() {
-            recursionDepth++;
-            if (recursionDepth > maxRecursionDepth) maxRecursionDepth = recursionDepth;
-        }
-        public void onExit() { recursionDepth--; }
-
+        public void onEnter() { if (++recursionDepth > maxRecursionDepth) maxRecursionDepth = recursionDepth; }
+        public void onExit()  { --recursionDepth; }
         @Override public String toString() {
-            return "Metrics{" +
-                    "comparisons=" + comparisons +
-                    ", swaps=" + swaps +
-                    ", allocations=" + allocations +
-                    ", maxRecursionDepth=" + maxRecursionDepth +
-                    ", elapsedNanos=" + elapsedNanos +
-                    '}';
+            return "Metrics{comparisons=" + comparisons + ", swaps=" + swaps +
+                    ", allocations=" + allocations + ", maxRecursionDepth=" + maxRecursionDepth +
+                    ", elapsedNanos=" + elapsedNanos + '}';
         }
     }
 
@@ -41,6 +29,24 @@ public final class DeterministicSelect {
         int ans = copy[k];
         m.elapsedNanos = System.nanoTime() - t0;
         return ans;
+    }
+
+    private static void swap(int[] a, int i, int j, Metrics m) {
+        if (i == j) return;
+        int t = a[i]; a[i] = a[j]; a[j] = t;
+        if (m != null) m.swaps++;
+    }
+    private static void insertionSort(int[] a, int l, int r, Metrics m) {
+        for (int i = l + 1; i <= r; i++) {
+            int key = a[i], j = i - 1;
+            while (j >= l) {
+                if (m != null) m.comparisons++;
+                if (a[j] <= key) break;
+                a[j + 1] = a[j];
+                j--;
+            }
+            a[j + 1] = key;
+        }
     }
 
     public static void main(String[] args) {
