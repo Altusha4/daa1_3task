@@ -30,26 +30,40 @@ public final class DeterministicSelect {
         return ans;
     }
 
-    /** Уже MoM5, но без tail-elimination и smaller-first. */
     private static int selectInPlace(int[] a, int l, int r, int k, Metrics m) {
-        if (l == r) return a[l];
+        while (true) {
+            if (l == r) return a[l];
 
-        int pivotVal = medianOfMedians(a, l, r, m);
-        int p = partitionAroundValue(a, l, r, pivotVal, m);
+            int pivotVal = medianOfMedians(a, l, r, m);
+            int p = partitionAroundValue(a, l, r, pivotVal, m);
 
-        if (k == p) return a[p];
-        if (k < p) {
-            m.onEnter();
-            int res = selectInPlace(a, l, p - 1, k, m);
-            m.onExit();
-            return res;
-        } else {
-            m.onEnter();
-            int res = selectInPlace(a, p + 1, r, k, m);
-            m.onExit();
-            return res;
+            if (k == p) return a[p];
+
+            int leftSize = p - l;
+            int rightSize = r - p;
+
+            if (k < p) {
+                if (leftSize <= rightSize) { // рекурсируемся в меньшую
+                    m.onEnter();
+                    int res = selectInPlace(a, l, p - 1, k, m);
+                    m.onExit();
+                    return res;
+                } else {
+                    r = p - 1;               // большую сторону обрабатываем хвостом (цикл)
+                }
+            } else {
+                if (rightSize <= leftSize) {
+                    m.onEnter();
+                    int res = selectInPlace(a, p + 1, r, k, m);
+                    m.onExit();
+                    return res;
+                } else {
+                    l = p + 1;
+                }
+            }
         }
     }
+
 
     private static int medianOfMedians(int[] a, int l, int r, Metrics m) {
         int n = r - l + 1;
